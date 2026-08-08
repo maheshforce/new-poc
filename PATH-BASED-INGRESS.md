@@ -69,20 +69,13 @@ kubectl get ingress --all-namespaces
 # keda        keda       alb     *       k8s-keda-keda-3456.us-east-1.elb          80      2m
 ```
 
-### Step 4: Consolidate to Single ALB (Optional)
+### Step 4: Native ALB Consolidation (Cost Optimization)
 
-For cost optimization, you can use a single ALB with path-based routing:
+Instead of a single external manifest file, the consolidation is natively handled by the **AWS ALB IngressGroups** annotation (`alb.ingress.kubernetes.io/group.name: consolidated-apps`) defined inside each application's Helm chart. 
 
-```bash
-# Apply consolidated ingress
-kubectl apply -f consolidated-ingress-pathbased.yaml
-
-# This creates a single ALB that routes:
-# - /jenkins → Jenkins service
-# - /argocd → ArgoCD service
-# - /karpenter → Karpenter service
-# - /keda → KEDA service
-```
+When you deploy the Helm charts, the AWS Load Balancer Controller automatically merges their separate, segregated Ingress resources into a **single, shared Application Load Balancer**.
+- **Result**: Single ALB serving all 4 paths (`/jenkins`, `/argocd`, `/karpenter`, `/keda`).
+- **Cost**: ~$20/month instead of ~$70/month (70%+ savings).
 
 ### Step 5: Access Applications
 

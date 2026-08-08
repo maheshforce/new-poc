@@ -12,7 +12,7 @@ spec:
 
   # Source - where to get the Helm chart
   source:
-    repoURL: https://github.com/your-org/your-repo  # Replace with your repo
+    repoURL: https://github.com/maheshforce/new-poc.git  # Replace with your repo
     targetRevision: main                             # Git branch to sync from
     path: helm/aws-alb-ingress-controller            # Path to Helm chart in repo
     
@@ -24,10 +24,10 @@ spec:
         serviceAccount:
           create: true
           annotations:
-            eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/alb-ingress-controller"  # Update ACCOUNT_ID
+            eks.amazonaws.com/role-arn: "arn:aws:iam::026847072954:role/AWSLoadBalancerControllerRole"
         aws:
-          region: us-east-1
-          vpcId: vpc-xxxxxxxx  # Update with your VPC ID
+          region: ap-south-1
+          vpcId: vpc-0b4108e9d8ece8d80  # Updated with active VPC ID
         enableShield: false
         enableWaf: false
         enableWafv2: false

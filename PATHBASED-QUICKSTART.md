@@ -93,17 +93,13 @@ kubectl get ingress -A
 # keda        keda       alb     k8s-keda-keda-xxxxx.us-e...         80
 ```
 
-## Consolidate to Single ALB (Cost Optimization)
+## Ingress Consolidation via IngressGroups (Cost Optimization)
 
-You can merge all 4 ingresses into 1 for even lower cost:
+Instead of a single external YAML file, the consolidation is natively handled by the **AWS ALB IngressGroups** annotation (`alb.ingress.kubernetes.io/group.name: consolidated-apps`) defined inside each application's Helm chart. 
 
-```bash
-# Apply consolidated ingress manifest
-kubectl apply -f consolidated-ingress-pathbased.yaml
-
-# Result: Single ALB with all 4 paths
-# Cost: ~$20/month instead of ~$70/month (70% savings!)
-```
+When you deploy the Helm charts, the AWS Load Balancer Controller automatically merges their separate, segregated Ingress resources into a **single, shared Application Load Balancer**.
+- **Result**: Single ALB serving all 4 paths (`/jenkins`, `/argocd`, `/karpenter`, `/keda`).
+- **Cost**: ~$20/month instead of ~$70/month (70%+ savings).
 
 ## Troubleshooting
 
@@ -144,7 +140,6 @@ kubectl exec -it pod/jenkins-0 -n jenkins -- curl http://localhost:8080/
 ## Key Files
 
 - **PATH-BASED-INGRESS.md** - Complete guide with advanced configuration
-- **consolidated-ingress-pathbased.yaml** - Single ALB manifest
 - **helm/*/values.yaml** - Path-based ingress configuration for each app
 - **helm/*/templates/ingress.yaml** - Path-based ingress templates
 
@@ -170,8 +165,7 @@ kubectl exec -it pod/jenkins-0 -n jenkins -- curl http://localhost:8080/
 1. ✅ Deploy ALB controller
 2. ✅ Deploy all apps with path-based ingress
 3. Access services through ALB URL
-4. (Optional) Consolidate to single ALB
-5. Setup DNS CNAME record to ALB (optional)
+4. Setup DNS CNAME record to ALB (optional)
 6. Configure TLS/SSL (optional)
 7. Setup monitoring and alerts
 

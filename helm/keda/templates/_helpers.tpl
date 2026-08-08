@@ -1,60 +1,32 @@
-{{/*
-Expand the name of the chart.
-*/}}
-{{- define "keda.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Create a default fully qualified app name.
-*/}}
-{{- define "keda.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
+{{/* vim: set filetype=mustache: */}}
 
 {{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "keda.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Generate basic labels for CRD
+*/}}
+{{- define "keda.crd-labels" }}
+helm.sh/chart: {{ include "keda.chart" . }}
+app.kubernetes.io/component: operator
+app.kubernetes.io/managed-by: {{ .Values.customManagedBy | default .Release.Service }}
+app.kubernetes.io/part-of: {{ .Values.operator.name }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion }}
+{{- end }}
 {{- end }}
 
 {{/*
-Common labels
+Generate basic labels
 */}}
 {{- define "keda.labels" -}}
-helm.sh/chart: {{ include "keda.chart" . }}
-{{ include "keda.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "keda.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "keda.name" . }}
+{{- include "keda.crd-labels" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end }}
-
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "keda.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "keda.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
+{{- if .Values.additionalLabels }}
+{{ toYaml .Values.additionalLabels }}
 {{- end }}
 {{- end }}

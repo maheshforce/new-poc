@@ -1,20 +1,41 @@
+{{- if.Values.serviceMonitor.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aws-alb-ingress-controller.fullname" . }}
+  name: {{ template "aws-load-balancer-controller.fullname" . }}
   namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "aws-alb-ingress-controller.labels" . | nindent 4 }}
-  {{- with .Values.service.annotations }}
+  {{- with .Values.serviceAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  labels:
+    {{- include "aws-load-balancer-controller.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.targetPort }}
-      protocol: TCP
-      name: https
+    - port: 8080
+      name: metrics-server
+      targetPort: metrics-server
   selector:
-    {{- include "aws-alb-ingress-controller.selectorLabels" . | nindent 4 }}
+    {{- include "aws-load-balancer-controller.selectorLabels" . | nindent 4 }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "aws-load-balancer-controller.webhookService" . }}
+  namespace: {{ .Release.Namespace }}
+  {{- with .Values.serviceAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "aws-load-balancer-controller.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+    prometheus.io/service-monitor: "false"
+spec:
+  ports:
+  - port: 443
+    name: webhook-server
+    targetPort: webhook-server
+  selector:
+    {{- include "aws-load-balancer-controller.selectorLabels" . | nindent 4 }}

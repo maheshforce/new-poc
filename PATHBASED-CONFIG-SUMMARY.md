@@ -279,10 +279,6 @@ spec:
 - Verification steps
 - Common issues and solutions
 
-### 3. consolidated-ingress-pathbased.yaml
-- Single ALB ingress manifest routing to all 4 services
-- Cost-optimized approach
-- Ready to apply with `kubectl apply -f`
 
 ### 4. verify-pathbased-ingress.sh
 - Automated verification script
@@ -319,13 +315,8 @@ helm install karpenter ./helm/karpenter -n karpenter --create-namespace
 helm install keda ./helm/keda -n keda --create-namespace
 ```
 
-### 3. Optional: Consolidate to Single ALB
-
-For cost optimization, merge all ingresses into one:
-
-```bash
-kubectl apply -f consolidated-ingress-pathbased.yaml
-```
+### 3. Native Consolidation
+The consolidation is natively managed via IngressGroups defined inside each application's Helm chart. Deploying the Helm charts automatically creates the segregated Ingress resources and registers them under a single shared ALB.
 
 ## Access URLs
 
@@ -343,10 +334,9 @@ KEDA:      http://ALB-DNS/keda
 | Approach | Monthly Cost | Notes |
 |----------|--------------|-------|
 | 4 Host-Based ALBs | ~$70-100 | $16.20 × 4 ALBs + LCU |
-| 4 Path-Based ALBs | ~$20-30 | Individual ingresses, some ALB sharing |
-| 1 Consolidated ALB | ~$20-25 | **RECOMMENDED** - Single ALB, all services |
+| 1 Shared ALB (IngressGroup) | ~$20-25 | **RECOMMENDED** - Single ALB natively shared via IngressGroup |
 
-**Savings with consolidated ALB: 70-80%**
+**Savings with Shared ALB: 70-80%**
 
 ## Key Benefits
 
@@ -456,7 +446,6 @@ If you had previously used host-based routing:
 |------|---------|
 | PATH-BASED-INGRESS.md | Complete path-based routing guide |
 | PATHBASED-QUICKSTART.md | 5-minute quick start guide |
-| consolidated-ingress-pathbased.yaml | Single ALB manifest |
 | verify-pathbased-ingress.sh | Verification script |
 
 ## Troubleshooting Resources

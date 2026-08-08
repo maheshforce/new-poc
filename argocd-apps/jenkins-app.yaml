@@ -12,7 +12,7 @@ spec:
 
   # Source - where to get the Helm chart
   source:
-    repoURL: https://github.com/your-org/your-repo  # Replace with your repo
+    repoURL: https://github.com/maheshforce/new-poc.git  # Replace with your repo
     targetRevision: main                             # Git branch to sync from
     path: helm/jenkins                               # Path to Helm chart in repo
     
@@ -25,6 +25,7 @@ spec:
           enabled: true
           size: 20Gi
           storageClassName: gp2
+        javaOpts: "-Xms512m -Xmx2g -Djenkins.model.Jenkins.prefix=/jenkins"
         ingress:
           enabled: true
           className: alb
@@ -33,6 +34,8 @@ spec:
             alb.ingress.kubernetes.io/scheme: internet-facing
             alb.ingress.kubernetes.io/target-type: ip
             alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+            alb.ingress.kubernetes.io/group.name: consolidated-apps
+            alb.ingress.kubernetes.io/group.order: '10'
 
   # Destination - where to deploy
   destination:
