@@ -1,0 +1,66 @@
+name: Terraform Lint and Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'terraform/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'terraform/**'
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: latest
+    
+    - name: Terraform Format Check
+      run: terraform fmt -check -recursive terraform/
+      continue-on-error: true
+    
+    - name: Terraform Init (VPC)
+      run: |
+        cd terraform/vpc
+        terraform init -backend=false
+    
+    - name: Terraform Validate (VPC)
+      run: |
+        cd terraform/vpc
+        terraform validate
+    
+    - name: Terraform Init (EKS)
+      run: |
+        cd terraform/eks
+        terraform init -backend=false
+    
+    - name: Terraform Validate (EKS)
+      run: |
+        cd terraform/eks
+        terraform validate
+    
+    - name: TFLint
+      uses: terraform-linters/setup-tflint@v4
+      with:
+        tflint_version: latest
+    
+    - name: Run TFLint (VPC)
+      run: |
+        cd terraform/vpc
+        tflint --init
+        tflint
+      continue-on-error: true
+    
+    - name: Run TFLint (EKS)
+      run: |
+        cd terraform/eks
+        tflint --init
+        tflint
+      continue-on-error: true

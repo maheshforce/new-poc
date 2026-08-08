@@ -1,0 +1,144 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: consolidated-apps
+  namespace: default
+  annotations:
+    # ALB Configuration
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    
+    # Tags for cost tracking
+    alb.ingress.kubernetes.io/tags: 'Environment=Dev,Team=DevOps'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      load_balancing.cross_zone.enabled=true,
+      idle_timeout.connection.s=60
+spec:
+  ingressClassName: alb
+  rules:
+    # Jenkins - Path-based routing
+    - http:
+        paths:
+          - path: /jenkins
+            pathType: Prefix
+            backend:
+              service:
+                name: jenkins
+                port:
+                  number: 80
+    
+    # ArgoCD - Path-based routing
+    - http:
+        paths:
+          - path: /argocd
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+    
+    # Karpenter - Path-based routing
+    - http:
+        paths:
+          - path: /karpenter
+            pathType: Prefix
+            backend:
+              service:
+                name: karpenter
+                port:
+                  number: 8080
+    
+    # KEDA - Path-based routing
+    - http:
+        paths:
+          - path: /keda
+            pathType: Prefix
+            backend:
+              service:
+                name: keda-operator
+                port:
+                  number: 80
+---
+# AWS ALB LoadBalancer
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: consolidated-apps-tgb
+  namespace: default
+spec:
+  targetGroupARN: arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/consolidated-apps/1234567890abcdef
+  targetType: ip
+  targets:
+    - ip: 10.0.0.1
+      port: 8080
+---
+# Service for Jenkins (if not already exposed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins
+  namespace: jenkins
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: jenkins
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+# Service for ArgoCD (if not already exposed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  namespace: argocd
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+# Service for Karpenter (if not already exposed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: karpenter
+  namespace: karpenter
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: karpenter
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+# Service for KEDA (if not already exposed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-operator
+  namespace: keda
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: keda-operator
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

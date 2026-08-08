@@ -1,0 +1,29 @@
+{{- if .Values.server.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "argocd.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "argocd.labels" . | nindent 4 }}
+  {{- with .Values.server.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.server.ingress.ingressClassName }}
+  rules:
+    - http:
+        paths:
+          - path: {{ .Values.server.ingress.pathPrefix }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "argocd.fullname" . }}-server
+                port:
+                  number: {{ .Values.server.service.port }}
+  {{- with .Values.server.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

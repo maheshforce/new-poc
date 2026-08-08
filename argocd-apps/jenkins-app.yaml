@@ -1,0 +1,89 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jenkins
+  namespace: argocd
+  labels:
+    app: jenkins
+    version: v1
+spec:
+  # Project for RBAC
+  project: default
+
+  # Source - where to get the Helm chart
+  source:
+    repoURL: https://github.com/your-org/your-repo  # Replace with your repo
+    targetRevision: main                             # Git branch to sync from
+    path: helm/jenkins                               # Path to Helm chart in repo
+    
+    # Helm-specific config
+    helm:
+      releaseName: jenkins
+      values: |
+        replicaCount: 1
+        persistence:
+          enabled: true
+          size: 20Gi
+          storageClassName: gp2
+        ingress:
+          enabled: true
+          className: alb
+          pathPrefix: /jenkins
+          annotations:
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+
+  # Destination - where to deploy
+  destination:
+    server: https://kubernetes.default.svc       # Local cluster (or use external URL)
+    namespace: jenkins                            # Target namespace
+
+  # Sync policy - automatic syncing
+  syncPolicy:
+    automated:
+      prune: true                                 # Delete resources not in Git
+      selfHeal: true                              # Reconcile drift automatically
+    syncOptions:
+      - CreateNamespace=true                      # Create namespace if missing
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignore differences in certain fields
+  ignoreDifferences:
+    - group: ""
+      kind: ServiceAccount
+      jsonPointers:
+        - /imagePullSecrets
+    - group: ""
+      kind: Secret
+      jsonPointers:
+        - /data
+
+---
+# Notification: This application will deploy Jenkins using the Helm chart
+# ArgoCD will:
+# 1. Clone the Git repo at specified targetRevision (main)
+# 2. Read the Helm chart from helm/jenkins/
+# 3. Apply the values specified in helm.values
+# 4. Deploy to jenkins namespace with auto-creation
+# 5. Continuously reconcile - if drift detected, auto-sync will fix it
+#
+# To trigger deployment:
+# kubectl apply -f argocd-apps/jenkins-app.yaml
+#
+# To monitor:
+# argocd app get jenkins
+# argocd app logs jenkins --follow
+#
+# To manually sync (if auto-sync is disabled):
+# argocd app sync jenkins
+#
+# To update configuration:
+# 1. Edit this file or helm/jenkins/values.yaml in Git
+# 2. Commit and push
+# 3. ArgoCD automatically detects and syncs changes (within 3 minutes by default)

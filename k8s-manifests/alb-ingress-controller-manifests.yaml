@@ -1,0 +1,507 @@
+---
+# ALB Ingress Controller YAML Manifests
+# These are raw Kubernetes manifests for deploying the AWS Load Balancer Controller
+# Can be applied directly with: kubectl apply -f alb-ingress-controller-manifests.yaml
+# Or deployed via ArgoCD using the Helm chart in helm/aws-alb-ingress-controller/
+
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-system
+  labels:
+    name: kube-system
+
+---
+# ServiceAccount for ALB Controller
+# This service account is associated with an IAM role via IRSA (IAM Roles for Service Accounts)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/version: v2.7.0
+  annotations:
+    # Link to AWS IAM role via IRSA (replace ACCOUNT_ID with your AWS account ID)
+    # The IAM role must exist and trust the OIDC provider
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/aws-load-balancer-controller"
+
+---
+# ClusterRole for ALB Controller
+# Permissions needed to manage Ingress resources and AWS ALBs/NLBs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aws-load-balancer-controller
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+rules:
+  # Ingress resources
+  - apiGroups:
+      - ""
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Ingress class
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Services
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Service endpoints
+  - apiGroups:
+      - ""
+    resources:
+      - services/status
+    verbs:
+      - patch
+      - update
+  
+  # Pods
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # ConfigMaps
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Secrets
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Nodes
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Events
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  
+  # TargetGroupBindings (custom resource for ALB controller)
+  - apiGroups:
+      - elbv2.k8s.aws
+    resources:
+      - targetgroupbindings
+    verbs:
+      - get
+      - list
+      - watch
+  
+  - apiGroups:
+      - elbv2.k8s.aws
+    resources:
+      - targetgroupbindings/status
+    verbs:
+      - patch
+      - update
+
+---
+# ClusterRoleBinding for ALB Controller
+# Binds the ClusterRole to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aws-load-balancer-controller
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aws-load-balancer-controller
+subjects:
+  - kind: ServiceAccount
+    name: aws-load-balancer-controller
+    namespace: kube-system
+
+---
+# Deployment for ALB Controller
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aws-load-balancer-controller
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+    app.kubernetes.io/version: v2.7.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-load-balancer-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aws-load-balancer-controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: aws-load-balancer-controller
+      securityContext:
+        fsGroup: 65534  # nobody group
+      containers:
+        - name: aws-load-balancer-controller
+          image: public.ecr.aws/eks/aws-load-balancer-controller:v2.7.0
+          imagePullPolicy: IfNotPresent
+          args:
+            # Enable detailed logging for debugging
+            - --cluster-name=YOUR_CLUSTER_NAME  # Replace with your EKS cluster name
+            - --ingress-class=alb
+            - --aws-region=us-east-1            # Replace with your AWS region
+            - --feature-gates=NLBHealthCheckAdvancedConfiguration=true
+            - --webhook-bind-port=9443
+            - --healthz-bind-port=8081
+          
+          ports:
+            # Webhook server port (TLS)
+            - name: webhook
+              containerPort: 9443
+              protocol: TCP
+            
+            # Metrics port (Prometheus)
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            
+            # Health check port
+            - name: healthz
+              containerPort: 8081
+              protocol: TCP
+          
+          # Liveness probe - restart if controller crashes
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          # Readiness probe - traffic only when ready
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          
+          # Resource limits
+          resources:
+            requests:
+              cpu: 200m
+              memory: 500Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          
+          # Security context for the container
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534  # nobody user
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          
+          # Volume mounts
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+      
+      # Pod-level security context
+      securityContext:
+        fsGroup: 65534
+      
+      # Volumes
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: aws-load-balancer-webhook-tls
+            optional: true
+      
+      # Anti-affinity: spread across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - aws-load-balancer-controller
+                topologyKey: kubernetes.io/hostname
+      
+      # Tolerations for node taints
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Equal
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Equal
+          effect: NoSchedule
+
+---
+# Service for ALB Controller Webhook
+# Exposes the webhook for ValidatingWebhookConfiguration
+apiVersion: v1
+kind: Service
+metadata:
+  name: aws-load-balancer-webhook-service
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+spec:
+  type: ClusterIP
+  ports:
+    - name: webhook
+      port: 443
+      targetPort: 9443
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: aws-load-balancer-controller
+
+---
+# ValidatingWebhookConfiguration
+# Validates Ingress and TargetGroupBinding resources before they're created
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: aws-load-balancer-webhook
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+webhooks:
+  # Validate Ingress resources
+  - name: ingress.elbv2.k8s.aws
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /validate-networking-v1-ingress
+      caBundle: LS0tLS1CRUdJTi... # Base64 encoded CA certificate (see notes below)
+    failurePolicy: Ignore
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    rules:
+      - apiGroups:
+          - networking.k8s.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - ingresses
+        scope: Namespaced
+  
+  # Validate TargetGroupBindings
+  - name: targetgroupbindings.elbv2.k8s.aws
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /validate-elbv2-k8s-aws-v1beta1-targetgroupbinding
+      caBundle: LS0tLS1CRUdJTi... # Base64 encoded CA certificate
+    failurePolicy: Ignore
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    rules:
+      - apiGroups:
+          - elbv2.k8s.aws
+        apiVersions:
+          - v1beta1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - targetgroupbindings
+        scope: Namespaced
+
+---
+# MutatingWebhookConfiguration
+# Automatically adds annotations and labels to resources
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: aws-load-balancer-mutating-webhook
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+webhooks:
+  - name: ingress.elbv2.k8s.aws
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /mutate-networking-v1-ingress
+      caBundle: LS0tLS1CRUdJTi... # Base64 encoded CA certificate
+    failurePolicy: Ignore
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    rules:
+      - apiGroups:
+          - networking.k8s.io
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - ingresses
+        scope: Namespaced
+  
+  - name: targetgroupbindings.elbv2.k8s.aws
+    clientConfig:
+      service:
+        name: aws-load-balancer-webhook-service
+        namespace: kube-system
+        path: /mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding
+      caBundle: LS0tLS1CRUdJTi... # Base64 encoded CA certificate
+    failurePolicy: Ignore
+    sideEffects: None
+    admissionReviewVersions:
+      - v1
+      - v1beta1
+    rules:
+      - apiGroups:
+          - elbv2.k8s.aws
+        apiVersions:
+          - v1beta1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - targetgroupbindings
+        scope: Namespaced
+
+---
+# IngressClass for ALB
+# Defines the ALB controller as an ingress class option
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: alb
+  labels:
+    app.kubernetes.io/name: aws-load-balancer-controller
+spec:
+  controller: ingress.k8s.aws/alb
+
+---
+# Notes and Deployment Instructions:
+#
+# 1. PREREQUISITES:
+#    - EKS cluster with OIDC provider enabled
+#    - IAM role created with ALB controller permissions
+#    - AWS credentials configured (via IRSA or EC2 instance role)
+#
+# 2. REQUIRED UPDATES BEFORE DEPLOYMENT:
+#    a) ServiceAccount annotation (line ~80):
+#       Replace: ACCOUNT_ID with your AWS account ID
+#       Find your account ID: aws sts get-caller-identity --query Account
+#    
+#    b) Deployment args (line ~160):
+#       Replace: YOUR_CLUSTER_NAME with your EKS cluster name
+#       Find: aws eks list-clusters
+#    
+#    c) ValidatingWebhookConfiguration caBundle (line ~240 & ~270):
+#       Replace: LS0tLS1CRUdJTi... with actual CA certificate base64
+#       Generate: kubectl get secret -n kube-system aws-load-balancer-webhook-tls -o jsonpath='{.data.ca\.crt}'
+#       (Note: This is auto-generated on first webhook request, so this can be empty initially)
+#
+#    d) MutatingWebhookConfiguration caBundle (line ~300 & ~315):
+#       Same as ValidatingWebhookConfiguration
+#
+# 3. DEPLOYMENT:
+#    kubectl apply -f alb-ingress-controller-manifests.yaml
+#
+# 4. VERIFICATION:
+#    kubectl get deployment -n kube-system aws-load-balancer-controller
+#    kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+#    kubectl get ingress -A  # Should show ALB addresses in ADDRESS column
+#
+# 5. IRSA SETUP (if not already done):
+#    a) Enable OIDC provider on EKS cluster:
+#       eksctl utils associate-iam-oidc-provider --cluster=YOUR_CLUSTER_NAME --approve
+#    
+#    b) Create IAM role with ALB permissions:
+#       aws iam create-role --role-name aws-load-balancer-controller --assume-role-policy-document file://trust-policy.json
+#    
+#    c) Attach ALB controller policy:
+#       aws iam attach-role-policy --role-name aws-load-balancer-controller --policy-arn arn:aws:iam::aws:policy/AWSLoadBalancerControllerIAMPolicy
+#
+# 6. TROUBLESHOOTING:
+#    - ALB not created: Check controller logs and IRSA setup
+#    - Webhook errors: Verify TLS certificate and caBundle values
+#    - Ingress not syncing: Check controller permissions and VPC/subnet tags
+#
+# 7. ALTERNATIVES:
+#    - Use Helm chart: helm install aws-load-balancer-controller ./helm/aws-alb-ingress-controller
+#    - Use ArgoCD: kubectl apply -f argocd-apps/alb-ingress-controller-app.yaml

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: keda
+description: A Helm chart for KEDA - Kubernetes Event-Driven Autoscaling
+type: application
+version: 1.0.0
+appVersion: "2.13.0"
+keywords:
+  - keda
+  - autoscaling
+  - event-driven
+home: https://keda.sh
+sources:
+  - https://github.com/kedacore/keda
+maintainers:
+  - name: Rapyder Cloud Solutions
+    email: support@rapyder.com

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: argocd
+description: A Helm chart for ArgoCD - Declarative GitOps CD for Kubernetes
+type: application
+version: 1.0.0
+appVersion: "2.8.0"
+keywords:
+  - argocd
+  - gitops
+  - continuous-delivery
+home: https://argoproj.github.io/argo-cd/
+sources:
+  - https://github.com/argoproj/argo-cd
+maintainers:
+  - name: Rapyder Cloud Solutions
+    email: support@rapyder.com

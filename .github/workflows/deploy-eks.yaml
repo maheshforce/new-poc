@@ -1,0 +1,78 @@
+name: Deploy to EKS
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'helm/**'
+      - '.github/workflows/deploy-eks.yaml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set up Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+    
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig \
+          --region ${{ env.AWS_REGION }} \
+          --name ${{ secrets.EKS_CLUSTER_NAME }}
+    
+    - name: Create namespaces
+      run: |
+        kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace karpenter --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace keda --dry-run=client -o yaml | kubectl apply -f -
+    
+    - name: Deploy Karpenter
+      run: |
+        helm upgrade --install karpenter ./helm/karpenter \
+          -n karpenter \
+          --create-namespace \
+          --set settings.aws.clusterName=${{ secrets.EKS_CLUSTER_NAME }} \
+          --wait
+    
+    - name: Deploy KEDA
+      run: |
+        helm upgrade --install keda ./helm/keda \
+          -n keda \
+          --create-namespace \
+          --wait
+    
+    - name: Deploy ArgoCD
+      run: |
+        helm upgrade --install argocd ./helm/argocd \
+          -n argocd \
+          --create-namespace \
+          --wait
+    
+    - name: Check deployment status
+      run: |
+        kubectl get deployments -n argocd
+        kubectl get deployments -n karpenter
+        kubectl get deployments -n keda
+    
+    - name: Get ArgoCD Service Info
+      run: |
+        echo "ArgoCD Service:"
+        kubectl get svc -n argocd
+        echo "ArgoCD Pods:"
+        kubectl get pods -n argocd

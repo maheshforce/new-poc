@@ -1,0 +1,16 @@
+aws_region   = "ap-south-1"
+environment  = "dev"
+cluster_name = "demo-eks-cluster"
+
+# Pass output values from the VPC deployment:
+vpc_id     = "vpc-01f62fba3d34bb2a4"
+subnet_ids = [
+  "subnet-09a06d39b27043cc6",
+  "subnet-09d54030b80bccf9f"
+]
+
+node_group_name = "demo-node-group"
+instance_types  = ["t3.medium"]
+desired_size    = 2
+min_size        = 1
+max_size        = 2

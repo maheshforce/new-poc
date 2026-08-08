@@ -1,0 +1,176 @@
+replicaCount: 1
+
+image:
+  repository: jenkins/jenkins
+  tag: "2.426.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  jnlpPort: 50000
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+  # Path-based routing (no domain required)
+  # Access via: ALB-URL/jenkins
+  pathPrefix: /jenkins
+  tls: []
+
+persistence:
+  enabled: true
+  storageClassName: gp2
+  size: 20Gi
+  mountPath: /var/jenkins_home
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+serviceAccount:
+  create: true
+  name: jenkins
+
+rbac:
+  create: true
+
+securityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+
+podSecurityContext: {}
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+javaOpts: "-Xms512m -Xmx2g"
+
+jenkinsUrl: ""
+jenkinsAdminEmail: "admin@example.com"
+
+controller:
+  installPlugins:
+    - kubernetes:latest
+    - docker:latest
+    - pipeline-stage-view:latest
+    - blueocean:latest
+    - git:latest
+    - github:latest
+    - gitlab:latest
+    - terraform:latest
+    - aws-credentials:latest
+    - credentials-binding:latest
+    - pipeline-model-definition:latest
+    - junit:latest
+    - cobertura:latest
+    - warnings-ng:latest
+    - slack:latest
+    - email-ext:latest
+
+  JCasC:
+    enabled: true
+    configScripts:
+      credentials: |
+        credentials:
+          system:
+            domainCredentials:
+              - credentials:
+                  - scope: GLOBAL
+                    id: "aws-credentials"
+                    description: "AWS Credentials"
+                    username: "${AWS_ACCESS_KEY_ID}"
+                    password: "${AWS_SECRET_ACCESS_KEY}"
+                    class: "com.cloudbees.jenkins.plugins.kubernetes.credentials.KubernetesCredential"
+      unclassified: |
+        location:
+          url: "${JENKINS_URL}"
+        mailer:
+          replyToAddress: "${JENKINS_ADMIN_EMAIL}"
+      cloud:
+        - kubernetes:
+            name: "kubernetes"
+            serverUrl: "https://kubernetes.default.svc.cluster.local"
+            skipHttpsCertificateCheck: true
+            namespace: "jenkins"
+            jenkinsUrl: "http://jenkins:80"
+            jenkinsTunnel: "jenkins:50000"
+
+  logLevel: "INFO"
+
+  numExecutors: 0
+
+agent:
+  enabled: true
+  image: jenkins/inbound-agent
+  tag: "latest"
+  
+  podTemplates:
+    - name: docker
+      namespace: jenkins
+      label: docker
+      serviceAccount: jenkins
+      containers:
+        - name: docker
+          image: docker:latest
+          command: cat
+          ttyEnabled: true
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+      volumes:
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+
+    - name: helm
+      namespace: jenkins
+      label: helm
+      serviceAccount: jenkins
+      containers:
+        - name: helm
+          image: alpine/helm:latest
+          command: cat
+          ttyEnabled: true
+
+    - name: terraform
+      namespace: jenkins
+      label: terraform
+      serviceAccount: jenkins
+      containers:
+        - name: terraform
+          image: hashicorp/terraform:latest
+          command: cat
+          ttyEnabled: true
+
+backupLocation: ""
+
+proxy:
+  httpPort: 8080
+  httpsPort: 8443
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80

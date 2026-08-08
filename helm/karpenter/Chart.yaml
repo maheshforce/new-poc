@@ -1,0 +1,16 @@
+apiVersion: v2
+name: karpenter
+description: A Helm chart for Karpenter - Kubernetes Autoscaler for AWS
+type: application
+version: 1.0.0
+appVersion: "0.32.0"
+keywords:
+  - karpenter
+  - autoscaling
+  - kubernetes
+home: https://karpenter.sh
+sources:
+  - https://github.com/aws/karpenter
+maintainers:
+  - name: Rapyder Cloud Solutions
+    email: support@rapyder.com

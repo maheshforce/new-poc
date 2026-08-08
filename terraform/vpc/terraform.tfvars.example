@@ -1,0 +1,12 @@
+aws_region         = "ap-south-1"
+environment        = "dev"
+cluster_name       = "demo-eks-cluster"
+vpc_cidr           = "10.0.0.0/16"
+availability_zones = ["ap-south-1a", "ap-south-1b"]
+
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+
+# Provision a single NAT Gateway across subnets for cost savings (set to false for Multi-AZ HA)
+single_nat_gateway = true
+

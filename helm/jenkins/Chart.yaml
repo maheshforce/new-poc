@@ -1,0 +1,17 @@
+apiVersion: v2
+name: jenkins
+description: A Helm chart for Jenkins CI/CD
+type: application
+version: 1.0.0
+appVersion: "2.426.0"
+keywords:
+  - jenkins
+  - ci
+  - cd
+  - automation
+home: https://www.jenkins.io
+sources:
+  - https://github.com/jenkinsci/helm-charts
+maintainers:
+  - name: Rapyder Cloud Solutions
+    email: support@rapyder.com

@@ -1,0 +1,83 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alb-ingress-controller
+  namespace: argocd
+  labels:
+    app: alb-ingress-controller
+    version: v1
+spec:
+  # Project for RBAC
+  project: default
+
+  # Source - where to get the Helm chart
+  source:
+    repoURL: https://github.com/your-org/your-repo  # Replace with your repo
+    targetRevision: main                             # Git branch to sync from
+    path: helm/aws-alb-ingress-controller            # Path to Helm chart in repo
+    
+    # Helm-specific config
+    helm:
+      releaseName: aws-alb-ingress-controller
+      values: |
+        replicaCount: 2
+        serviceAccount:
+          create: true
+          annotations:
+            eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/alb-ingress-controller"  # Update ACCOUNT_ID
+        aws:
+          region: us-east-1
+          vpcId: vpc-xxxxxxxx  # Update with your VPC ID
+        enableShield: false
+        enableWaf: false
+        enableWafv2: false
+
+  # Destination - where to deploy
+  destination:
+    server: https://kubernetes.default.svc       # Local cluster
+    namespace: kube-system                        # ALB controller runs in kube-system
+
+  # Sync policy - automatic syncing
+  syncPolicy:
+    automated:
+      prune: true                                 # Delete resources not in Git
+      selfHeal: true                              # Reconcile drift automatically
+    syncOptions:
+      - CreateNamespace=false                     # kube-system already exists
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Notification: This application will deploy AWS ALB Ingress Controller
+# ArgoCD will:
+# 1. Clone the Git repo at specified targetRevision (main)
+# 2. Read the Helm chart from helm/aws-alb-ingress-controller/
+# 3. Apply the values specified in helm.values
+# 4. Deploy to kube-system namespace
+# 5. Continuously reconcile - if drift detected, auto-sync will fix it
+#
+# IMPORTANT: Update the following before deploying:
+# - repoURL: Your GitHub repository
+# - serviceAccount.annotations.eks.amazonaws.com/role-arn: Your AWS account ID and role ARN
+# - aws.vpcId: Your VPC ID from AWS console
+#
+# To find your VPC ID:
+# aws ec2 describe-vpcs --region us-east-1 --query 'Vpcs[0].VpcId'
+#
+# To find your IAM role ARN (must be created separately):
+# aws iam list-roles | grep alb-ingress
+#
+# To trigger deployment:
+# kubectl apply -f argocd-apps/alb-ingress-controller-app.yaml
+#
+# To monitor:
+# argocd app get alb-ingress-controller
+# argocd app logs alb-ingress-controller --follow
+# kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+#
+# To manually sync:
+# argocd app sync alb-ingress-controller

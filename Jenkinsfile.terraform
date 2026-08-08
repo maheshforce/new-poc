@@ -1,0 +1,256 @@
+pipeline {
+    agent any
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        timestamps()
+        timeout(time: 60, unit: 'MINUTES')
+    }
+
+    environment {
+        AWS_REGION = 'us-east-1'
+        TF_VERSION = 'latest'
+        TF_INPUT = 'false'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    echo "✓ Repository checked out"
+                    sh 'git log -1 --oneline'
+                }
+            }
+        }
+
+        stage('Terraform Format Check') {
+            steps {
+                script {
+                    echo "📋 Checking Terraform formatting..."
+                    sh '''
+                        cd terraform
+                        terraform fmt -check -recursive . || {
+                            echo "❌ Terraform files need formatting"
+                            terraform fmt -recursive .
+                            echo "✓ Terraform files reformatted"
+                        }
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Init - VPC') {
+            steps {
+                script {
+                    echo "🔧 Initializing Terraform (VPC)..."
+                    sh '''
+                        cd terraform/vpc
+                        terraform init -no-color
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Validate - VPC') {
+            steps {
+                script {
+                    echo "✔ Validating Terraform (VPC)..."
+                    sh '''
+                        cd terraform/vpc
+                        terraform validate -no-color
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Plan - VPC') {
+            steps {
+                script {
+                    echo "📊 Planning Terraform changes (VPC)..."
+                    sh '''
+                        cd terraform/vpc
+                        terraform plan -out=tfplan -no-color
+                        
+                        echo ""
+                        echo "📄 Plan Summary:"
+                        terraform show -no-color tfplan | head -50
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Init - EKS') {
+            steps {
+                script {
+                    echo "🔧 Initializing Terraform (EKS)..."
+                    sh '''
+                        cd terraform/eks
+                        terraform init -no-color
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Validate - EKS') {
+            steps {
+                script {
+                    echo "✔ Validating Terraform (EKS)..."
+                    sh '''
+                        cd terraform/eks
+                        terraform validate -no-color
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Plan - EKS') {
+            steps {
+                script {
+                    echo "📊 Planning Terraform changes (EKS)..."
+                    sh '''
+                        cd terraform/eks
+                        terraform plan -out=tfplan -no-color
+                        
+                        echo ""
+                        echo "📄 Plan Summary:"
+                        terraform show -no-color tfplan | head -50
+                    '''
+                }
+            }
+        }
+
+        stage('TFLint') {
+            steps {
+                script {
+                    echo "🔍 Running TFLint analysis..."
+                    sh '''
+                        cd terraform/vpc
+                        echo "Linting VPC Terraform..."
+                        tflint --init 2>/dev/null || echo "TFLint not configured yet"
+                        tflint || echo "Warning: TFLint found issues (non-blocking)"
+                        
+                        cd ../eks
+                        echo "Linting EKS Terraform..."
+                        tflint --init 2>/dev/null || echo "TFLint not configured yet"
+                        tflint || echo "Warning: TFLint found issues (non-blocking)"
+                    '''
+                }
+            }
+        }
+
+        stage('Approval for Apply') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    input(message: 'Approve Terraform Apply?', ok: 'Apply')
+                }
+            }
+        }
+
+        stage('Terraform Apply - VPC') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "🚀 Applying Terraform changes (VPC)..."
+                    sh '''
+                        cd terraform/vpc
+                        terraform apply -auto-approve -no-color tfplan || {
+                            echo "❌ VPC Apply failed"
+                            exit 1
+                        }
+                        
+                        echo "✓ VPC created/updated successfully"
+                        echo ""
+                        echo "Outputs:"
+                        terraform output -no-color
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Apply - EKS') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "🚀 Applying Terraform changes (EKS)..."
+                    sh '''
+                        cd terraform/eks
+                        terraform apply -auto-approve -no-color tfplan || {
+                            echo "❌ EKS Apply failed"
+                            exit 1
+                        }
+                        
+                        echo "✓ EKS created/updated successfully"
+                        echo ""
+                        echo "Outputs:"
+                        terraform output -no-color
+                    '''
+                }
+            }
+        }
+
+        stage('Update kubeconfig') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo "🔐 Updating kubeconfig..."
+                    sh '''
+                        cd terraform/eks
+                        CLUSTER_NAME=$(terraform output -raw cluster_name 2>/dev/null || echo "eks-cluster")
+                        
+                        aws eks update-kubeconfig \
+                            --region ${AWS_REGION} \
+                            --name ${CLUSTER_NAME} || echo "Warning: Could not update kubeconfig"
+                        
+                        kubectl get nodes || echo "Warning: Could not connect to cluster"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sh '''
+                    echo "Cleaning up temporary files..."
+                    cd terraform/vpc && rm -f tfplan 2>/dev/null || true
+                    cd ../eks && rm -f tfplan 2>/dev/null || true
+                '''
+            }
+        }
+        success {
+            echo "✅ Terraform pipeline completed successfully"
+        }
+        failure {
+            echo "❌ Terraform pipeline failed"
+        }
+    }
+}
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo "✅ Terraform validation successful"
+        }
+        failure {
+            echo "❌ Terraform validation failed"
+        }
+    }
+}

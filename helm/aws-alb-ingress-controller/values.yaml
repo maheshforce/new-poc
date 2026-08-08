@@ -1,0 +1,145 @@
+replicaCount: 2
+
+image:
+  repository: public.ecr.aws/eks/aws-load-balancer-controller
+  tag: "v2.7.0"
+  pullPolicy: IfNotPresent
+
+nameOverride: aws-load-balancer-controller
+fullnameOverride: aws-load-balancer-controller
+
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations: {}
+
+rbac:
+  create: true
+
+podSecurityPolicy:
+  enabled: false
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  runAsUser: 65534
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 200Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - aws-load-balancer-controller
+          topologyKey: kubernetes.io/hostname
+
+priorityClassName: system-cluster-critical
+
+# AWS configuration
+aws:
+  region: us-east-1
+  # uncomment and set your account ID
+  # accountID: "123456789012"
+
+# VPC configuration
+vpcId: ""
+# comma-separated list of subnet IDs for ALB/NLB
+subnetIds: ""
+
+# Enable logging
+enableLogging: true
+
+# Metric server for HPA
+enableMetrics: true
+metricsPort: 8080
+metricsBindAddr: ":8080"
+
+# Webhook configuration
+webhook:
+  enabled: true
+  port: 9443
+  targetPort: 9443
+
+# Log level
+logLevel: info
+
+# Feature gates
+featureGates: {}
+
+# Environment variables
+env:
+  - name: AWS_REGION
+    value: "us-east-1"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 443
+  targetPort: 9443
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+
+# Ingress for webhook (optional)
+ingress:
+  enabled: false
+  className: alb
+  annotations: {}
+  hosts:
+    - host: webhook.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ClusterRole additional rules
+clusterRoleAdditionalRules: []
+
+# Default tags for all load balancers
+defaultTags:
+  ManagedBy: "helm"
+  Platform: "eks"
+
+# Common labels
+commonLabels: {}
+
+# Kubeconfig for remote cluster (optional)
+kubeConfig: ""
+
+# Network policy (optional)
+networkPolicy:
+  enabled: false
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+
+# Tolerations for node types
+tolerationSeconds: 300

@@ -1,0 +1,79 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  namespace: argocd
+  labels:
+    app: keda
+    version: v1
+spec:
+  # Project for RBAC
+  project: default
+
+  # Source - where to get the Helm chart
+  source:
+    repoURL: https://github.com/your-org/your-repo  # Replace with your repo
+    targetRevision: main                             # Git branch to sync from
+    path: helm/keda                                  # Path to Helm chart in repo
+    
+    # Helm-specific config
+    helm:
+      releaseName: keda
+      values: |
+        replicaCount: 2
+        ingress:
+          enabled: true
+          className: alb
+          pathPrefix: /keda
+          annotations:
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+            alb.ingress.kubernetes.io/backend-protocol: HTTP
+            alb.ingress.kubernetes.io/healthcheck-path: /healthz
+        metricsServer:
+          enabled: true
+          replicas: 1
+
+  # Destination - where to deploy
+  destination:
+    server: https://kubernetes.default.svc       # Local cluster
+    namespace: keda                               # Target namespace
+
+  # Sync policy - automatic syncing
+  syncPolicy:
+    automated:
+      prune: true                                 # Delete resources not in Git
+      selfHeal: true                              # Reconcile drift automatically
+    syncOptions:
+      - CreateNamespace=true                      # Create namespace if missing
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Notification: This application will deploy KEDA using the Helm chart
+# ArgoCD will:
+# 1. Clone the Git repo at specified targetRevision (main)
+# 2. Read the Helm chart from helm/keda/
+# 3. Apply the values specified in helm.values
+# 4. Deploy to keda namespace with auto-creation
+# 5. Continuously reconcile - if drift detected, auto-sync will fix it
+#
+# To trigger deployment:
+# kubectl apply -f argocd-apps/keda-app.yaml
+#
+# To monitor:
+# argocd app get keda
+# argocd app logs keda --follow
+#
+# To manually sync:
+# argocd app sync keda
+#
+# To update configuration:
+# 1. Edit helm/keda/values.yaml in Git
+# 2. Commit and push
+# 3. ArgoCD automatically detects and syncs changes

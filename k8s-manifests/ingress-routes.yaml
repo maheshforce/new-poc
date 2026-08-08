@@ -1,0 +1,180 @@
+---
+# Jenkins Ingress Route (Path-Based ALB)
+# Deploy with: kubectl apply -f jenkins-ingress.yaml
+# Access at: http://ALB-DNS/jenkins
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jenkins
+  namespace: jenkins
+  labels:
+    app: jenkins
+    version: v1
+  annotations:
+    # ALB configuration
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    
+    # Tags for cost tracking
+    alb.ingress.kubernetes.io/tags: 'Environment=Dev,Team=DevOps,App=Jenkins'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      load_balancing.cross_zone.enabled=true,
+      idle_timeout.connection.s=60
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /jenkins
+            pathType: Prefix
+            backend:
+              service:
+                name: jenkins
+                port:
+                  number: 80
+
+---
+# Karpenter Ingress Route (Path-Based ALB)
+# Deploy with: kubectl apply -f karpenter-ingress.yaml
+# Access at: http://ALB-DNS/karpenter
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: karpenter
+  namespace: karpenter
+  labels:
+    app: karpenter
+    version: v1
+  annotations:
+    # ALB configuration
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    
+    # Tags for cost tracking
+    alb.ingress.kubernetes.io/tags: 'Environment=Dev,Team=DevOps,App=Karpenter'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      load_balancing.cross_zone.enabled=true,
+      idle_timeout.connection.s=60
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /karpenter
+            pathType: Prefix
+            backend:
+              service:
+                name: karpenter
+                port:
+                  number: 8080
+
+---
+# KEDA Ingress Route (Path-Based ALB)
+# Deploy with: kubectl apply -f keda-ingress.yaml
+# Access at: http://ALB-DNS/keda
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keda
+  namespace: keda
+  labels:
+    app: keda
+    version: v1
+  annotations:
+    # ALB configuration
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    
+    # Health checks
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '2'
+    
+    # Tags for cost tracking
+    alb.ingress.kubernetes.io/tags: 'Environment=Dev,Team=DevOps,App=KEDA'
+    
+    # Load balancer attributes
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      load_balancing.cross_zone.enabled=true,
+      idle_timeout.connection.s=60
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /keda
+            pathType: Prefix
+            backend:
+              service:
+                name: keda-operator
+                port:
+                  number: 80
+
+---
+# Notes:
+#
+# These Ingress resources define path-based routing through a single ALB.
+# The ALB Ingress Controller (deployed separately) will create/manage the actual AWS ALB.
+#
+# Prerequisites:
+# 1. ALB Ingress Controller must be deployed first:
+#    kubectl apply -f alb-ingress-controller-manifests.yaml
+#
+# 2. Namespaces and services must exist:
+#    - jenkins namespace with jenkins service on port 80/8080
+#    - karpenter namespace with karpenter service on port 8080
+#    - keda namespace with keda-operator service on port 6443/80
+#
+# 3. IngressClass 'alb' must exist (created by ALB controller)
+#
+# Deployment:
+# kubectl apply -f jenkins-ingress.yaml
+# kubectl apply -f karpenter-ingress.yaml
+# kubectl apply -f keda-ingress.yaml
+#
+# Verification:
+# kubectl get ingress -n jenkins
+# kubectl get ingress -n karpenter
+# kubectl get ingress -n keda
+# kubectl describe ingress jenkins -n jenkins  # See ALB DNS address
+#
+# Access:
+# ALB_URL=$(kubectl get ingress -n jenkins -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}')
+# curl http://$ALB_URL/jenkins
+# curl http://$ALB_URL/karpenter
+# curl http://$ALB_URL/keda
+#
+# Troubleshooting:
+# - Check ALB controller logs: kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+# - Verify service exists: kubectl get svc -n jenkins
+# - Check pod endpoints: kubectl get endpoints -n jenkins
+# - Describe ingress: kubectl describe ingress jenkins -n jenkins

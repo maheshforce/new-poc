@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter
+  namespace: argocd
+  labels:
+    app: karpenter
+    version: v1
+spec:
+  # Project for RBAC
+  project: default
+
+  # Source - where to get the Helm chart
+  source:
+    repoURL: https://github.com/your-org/your-repo  # Replace with your repo
+    targetRevision: main                             # Git branch to sync from
+    path: helm/karpenter                             # Path to Helm chart in repo
+    
+    # Helm-specific config
+    helm:
+      releaseName: karpenter
+      values: |
+        replicaCount: 2
+        ingress:
+          enabled: true
+          className: alb
+          pathPrefix: /karpenter
+          annotations:
+            alb.ingress.kubernetes.io/scheme: internet-facing
+            alb.ingress.kubernetes.io/target-type: ip
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+            alb.ingress.kubernetes.io/backend-protocol: HTTP
+            alb.ingress.kubernetes.io/healthcheck-path: /healthz
+
+  # Destination - where to deploy
+  destination:
+    server: https://kubernetes.default.svc       # Local cluster
+    namespace: karpenter                          # Target namespace
+
+  # Sync policy - automatic syncing
+  syncPolicy:
+    automated:
+      prune: true                                 # Delete resources not in Git
+      selfHeal: true                              # Reconcile drift automatically
+    syncOptions:
+      - CreateNamespace=true                      # Create namespace if missing
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+# Notification: This application will deploy Karpenter using the Helm chart
+# ArgoCD will:
+# 1. Clone the Git repo at specified targetRevision (main)
+# 2. Read the Helm chart from helm/karpenter/
+# 3. Apply the values specified in helm.values
+# 4. Deploy to karpenter namespace with auto-creation
+# 5. Continuously reconcile - if drift detected, auto-sync will fix it
+#
+# To trigger deployment:
+# kubectl apply -f argocd-apps/karpenter-app.yaml
+#
+# To monitor:
+# argocd app get karpenter
+# argocd app logs karpenter --follow
+#
+# To manually sync:
+# argocd app sync karpenter
+#
+# To update configuration:
+# 1. Edit helm/karpenter/values.yaml in Git
+# 2. Commit and push
+# 3. ArgoCD automatically detects and syncs changes

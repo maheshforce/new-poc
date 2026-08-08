@@ -1,0 +1,20 @@
+apiVersion: v2
+name: aws-alb-ingress-controller
+description: AWS Load Balancer Controller for Kubernetes (ALB/NLB)
+type: application
+version: 1.0.0
+appVersion: 2.7.0
+keywords:
+  - aws
+  - alb
+  - ingress
+  - load-balancer
+  - nlb
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com
+home: https://github.com/aws/aws-load-balancer-controller
+sources:
+  - https://github.com/aws/aws-load-balancer-controller
+charts: []
+dependencies: []
