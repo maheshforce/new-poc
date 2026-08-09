@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 026847072954.dkr.ecr.ap-south-1.amazonaws.com/sample-app-dev
-  tag: "dev-latest"
+  tag: "dev-11"
 
 efs:
   accessPointId: "fsap-01cb050199bc324f1"
