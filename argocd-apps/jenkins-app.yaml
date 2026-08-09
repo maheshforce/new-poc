@@ -24,7 +24,7 @@ spec:
         persistence:
           enabled: true
           size: 20Gi
-          storageClassName: gp2
+          storageClass: gp3
         javaOpts: "-Xms512m -Xmx2g -Djenkins.model.Jenkins.prefix=/jenkins"
         ingress:
           enabled: true

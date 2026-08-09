@@ -21,6 +21,11 @@ spec:
       releaseName: karpenter
       values: |
         replicaCount: 2
+        serviceAccount:
+          annotations:
+            eks.amazonaws.com/role-arn: arn:aws:iam::026847072954:role/demo-eks-cluster-karpenter-controller-role
+        settings:
+          clusterName: demo-eks-cluster
         ingress:
           enabled: true
           className: alb

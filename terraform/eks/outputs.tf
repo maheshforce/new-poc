@@ -8,6 +8,8 @@ output "cluster_arn" {
   value       = module.eks.cluster_arn
 }
 
+
+
 output "cluster_name" {
   description = "The name of the EKS cluster"
   value       = module.eks.cluster_name
@@ -42,3 +44,24 @@ output "configure_kubectl" {
   description = "Command to update local kubeconfig for the EKS cluster"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
 }
+
+output "vpc_id" {
+  value = module.eks.vpc_id
+}
+
+output "subnet_ids" {
+  value = module.eks.private_subnet_ids
+}
+
+output "karpenter_controller_role_arn" {
+  value       = module.karpenter.karpenter_controller_role_arn
+  description = "IAM Role ARN for Karpenter Controller ServiceAccount"
+}
+
+output "karpenter_instance_profile_name" {
+  value       = module.karpenter.karpenter_instance_profile_name
+  description = "IAM Instance Profile name for Karpenter nodes"
+}
+
+
+

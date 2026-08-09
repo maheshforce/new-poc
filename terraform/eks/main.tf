@@ -22,3 +22,32 @@ module "eks" {
   tags            = var.tags
 
 }
+
+module "ebs_csi" {
+  source = "../modules/ebs"
+
+  cluster_name     = module.eks.cluster_name
+  oidc_issuer_url  = data.aws_eks_cluster.this.identity[0].oidc[0].issuer
+}
+
+data "aws_eks_cluster" "this" {
+  name = module.eks.cluster_name
+}
+
+module "efs" {
+  source = "../modules/efs"
+
+  cluster_name           = module.eks.cluster_name
+  vpc_id                 = module.eks.vpc_id
+  node_security_group_id = module.eks.node_security_group_id
+  subnet_ids             = module.eks.private_subnet_ids
+}
+
+module "karpenter" {
+  source = "../modules/karpenter"
+
+  cluster_name    = module.eks.cluster_name
+  oidc_issuer_url = data.aws_eks_cluster.this.identity[0].oidc[0].issuer
+  node_role_arn   = module.eks.node_group_role_arn
+  node_role_name  = module.eks.node_group_role_name
+}
