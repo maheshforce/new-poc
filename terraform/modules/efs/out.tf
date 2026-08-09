@@ -9,3 +9,11 @@ output "security_group_id" {
 output "access_point_id" {
   value = aws_efs_access_point.jenkins.id
 }
+
+output "dev_access_point_id" {
+  value = aws_efs_access_point.dev.id
+}
+
+output "prod_access_point_id" {
+  value = aws_efs_access_point.prod.id
+}

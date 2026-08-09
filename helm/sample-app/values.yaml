@@ -1,0 +1,31 @@
+replicaCount: 1
+
+image:
+  repository: 026847072954.dkr.ecr.ap-south-1.amazonaws.com/sample-app-dev
+  pullPolicy: IfNotPresent
+  tag: "dev-latest"
+
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 5000
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+efs:
+  fileSystemId: "fs-0372d59ce1217cca2"
+  accessPointId: "" # to be overridden in values-dev.yaml and values-prod.yaml
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  - name: DATA_DIR
+    value: /app/data

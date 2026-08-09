@@ -88,3 +88,51 @@ resource "aws_efs_access_point" "jenkins" {
     ManagedBy = "Terraform"
   }
 }
+
+resource "aws_efs_access_point" "dev" {
+  file_system_id = aws_efs_file_system.this.id
+
+  posix_user {
+    gid = 1000
+    uid = 1000
+  }
+
+  root_directory {
+    path = "/dev"
+
+    creation_info {
+      owner_gid   = 1000
+      owner_uid   = 1000
+      permissions = "755"
+    }
+  }
+
+  tags = {
+    Name      = "${var.cluster_name}-dev"
+    ManagedBy = "Terraform"
+  }
+}
+
+resource "aws_efs_access_point" "prod" {
+  file_system_id = aws_efs_file_system.this.id
+
+  posix_user {
+    gid = 1000
+    uid = 1000
+  }
+
+  root_directory {
+    path = "/prod"
+
+    creation_info {
+      owner_gid   = 1000
+      owner_uid   = 1000
+      permissions = "755"
+    }
+  }
+
+  tags = {
+    Name      = "${var.cluster_name}-prod"
+    ManagedBy = "Terraform"
+  }
+}

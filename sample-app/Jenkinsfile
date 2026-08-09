@@ -1,0 +1,76 @@
+pipeline {
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: kaniko
+    image: gcr.io/kaniko-project/executor:debug
+    command:
+    - sleep
+    args:
+    - 99d
+  - name: git
+    image: alpine/git:latest
+    command:
+    - sleep
+    args:
+    - 99d
+'''
+        }
+    }
+    parameters {
+        choice(name: 'ENVIRONMENT', choices: ['dev', 'prod'], description: 'Target deployment environment')
+    }
+    environment {
+        AWS_REGION = 'ap-south-1'
+        AWS_ACCOUNT_ID = '026847072954'
+    }
+    stages {
+        stage('Build & Push Image') {
+            steps {
+                container('kaniko') {
+                    script {
+                        def ecrRepo = params.ENVIRONMENT == 'dev' ? 'sample-app-dev' : 'sample-app-prod'
+                        def registryUrl = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                        def imageTag = "${params.ENVIRONMENT}-${BUILD_NUMBER}"
+                        def destination = "${registryUrl}/${ecrRepo}:${imageTag}"
+                        
+                        // Setup ECR Credential Helper config
+                        sh 'mkdir -p /kaniko/.docker'
+                        sh 'echo \'{"credsStore":"ecr-login"}\' > /kaniko/.docker/config.json'
+                        
+                        // Run Kaniko build and push
+                        sh "/kaniko/executor --context=dir://. --dockerfile=sample-app/Dockerfile --destination=${destination}"
+                    }
+                }
+            }
+        }
+        stage('Update Git Manifest') {
+            steps {
+                container('git') {
+                    script {
+                        def imageTag = "${params.ENVIRONMENT}-${BUILD_NUMBER}"
+                        def valuesFile = "helm/sample-app/values-${params.ENVIRONMENT}.yaml"
+                        
+                        // Git Config
+                        sh 'git config user.email "jenkins@rapyder.com"'
+                        sh 'git config user.name "Jenkins CI"'
+                        
+                        // Update the image tag in Helm values file
+                        sh "sed -i 's/tag: .*/tag: \"${imageTag}\"/g' ${valuesFile}"
+                        
+                        // Commit and push back to repository using github-token credential
+                        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                            sh "git add ${valuesFile}"
+                            sh "git commit -m 'ci: update ${params.ENVIRONMENT} image tag to ${imageTag} [skip ci]'"
+                            sh "git push https://${GITHUB_TOKEN}@github.com/maheshforce/new-poc.git main"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

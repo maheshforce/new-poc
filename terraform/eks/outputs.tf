@@ -63,5 +63,30 @@ output "karpenter_instance_profile_name" {
   description = "IAM Instance Profile name for Karpenter nodes"
 }
 
+output "ecr_dev_url" {
+  value       = aws_ecr_repository.dev.repository_url
+  description = "URL of the Dev ECR Repository"
+}
+
+output "ecr_prod_url" {
+  value       = aws_ecr_repository.prod.repository_url
+  description = "URL of the Prod ECR Repository"
+}
+
+output "efs_file_system_id" {
+  value       = module.efs.file_system_id
+  description = "ID of the shared EFS File System"
+}
+
+output "efs_dev_access_point_id" {
+  value       = module.efs.dev_access_point_id
+  description = "ID of the Dev EFS Access Point"
+}
+
+output "efs_prod_access_point_id" {
+  value       = module.efs.prod_access_point_id
+  description = "ID of the Prod EFS Access Point"
+}
+
 
 
