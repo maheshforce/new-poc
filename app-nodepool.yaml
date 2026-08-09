@@ -37,7 +37,7 @@ spec:
   role: demo-eks-cluster-node-group-role
   subnetSelectorTerms:
     - tags:
-        kubernetes.io/role/internal-elb: "1"
+        kubernetes.io/cluster/demo-eks-cluster: "shared"
   securityGroupSelectorTerms:
     - tags:
         kubernetes.io/cluster/demo-eks-cluster: "owned"
