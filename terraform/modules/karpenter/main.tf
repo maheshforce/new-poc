@@ -26,7 +26,7 @@ resource "aws_iam_role" "karpenter_controller" {
       Condition = {
         StringEquals = {
           "${local.oidc_provider}:aud" = "sts.amazonaws.com"
-          "${local.oidc_provider}:sub" = "system:serviceaccount:karpenter:karpenter-sa"
+          "${local.oidc_provider}:sub" = "system:serviceaccount:karpenter:karpenter"
         }
       }
     }]
@@ -59,7 +59,8 @@ resource "aws_iam_policy" "karpenter_controller" {
           "ec2:RunInstances",
           "ec2:TerminateInstances",
           "ssm:GetParameter",
-          "pricing:GetProducts"
+          "pricing:GetProducts",
+          "eks:DescribeCluster"
         ]
         Resource = "*"
       },
