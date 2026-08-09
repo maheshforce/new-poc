@@ -65,7 +65,7 @@ spec:
                     withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
                         sh "git add ${valuesFile}"
                         sh "git commit -m 'ci: update ${params.ENVIRONMENT} image tag to ${imageTag} [skip ci]'"
-                        sh "git push https://${GITHUB_TOKEN}@github.com/maheshforce/new-poc.git main"
+                            sh "git push https://${GITHUB_TOKEN}@github.com/maheshforce/new-poc.git HEAD:main"
                     }
                 }
             }
