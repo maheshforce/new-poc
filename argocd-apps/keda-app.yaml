@@ -49,6 +49,7 @@ spec:
       selfHeal: true                              # Reconcile drift automatically
     syncOptions:
       - CreateNamespace=true                      # Create namespace if missing
+      - ServerSideApply=true                      # Use Server-Side Apply to avoid annotation size limits
     retry:
       limit: 5
       backoff:
