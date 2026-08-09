@@ -50,24 +50,22 @@ spec:
         }
         stage('Update Git Manifest') {
             steps {
-                container('git') {
-                    script {
-                        def imageTag = "${params.ENVIRONMENT}-${BUILD_NUMBER}"
-                        def valuesFile = "helm/sample-app/values-${params.ENVIRONMENT}.yaml"
-                        
-                        // Git Config
-                        sh 'git config user.email "jenkins@rapyder.com"'
-                        sh 'git config user.name "Jenkins CI"'
-                        
-                        // Update the image tag in Helm values file
-                        sh "sed -i 's/tag: .*/tag: \"${imageTag}\"/g' ${valuesFile}"
-                        
-                        // Commit and push back to repository using github-token credential
-                        withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
-                            sh "git add ${valuesFile}"
-                            sh "git commit -m 'ci: update ${params.ENVIRONMENT} image tag to ${imageTag} [skip ci]'"
-                            sh "git push https://${GITHUB_TOKEN}@github.com/maheshforce/new-poc.git main"
-                        }
+                script {
+                    def imageTag = "${params.ENVIRONMENT}-${BUILD_NUMBER}"
+                    def valuesFile = "helm/sample-app/values-${params.ENVIRONMENT}.yaml"
+                    
+                    // Git Config
+                    sh 'git config user.email "jenkins@rapyder.com"'
+                    sh 'git config user.name "Jenkins CI"'
+                    
+                    // Update the image tag in Helm values file
+                    sh "sed -i 's/tag: .*/tag: \"${imageTag}\"/g' ${valuesFile}"
+                    
+                    // Commit and push back to repository using github-token credential
+                    withCredentials([string(credentialsId: 'github-token', variable: 'GITHUB_TOKEN')]) {
+                        sh "git add ${valuesFile}"
+                        sh "git commit -m 'ci: update ${params.ENVIRONMENT} image tag to ${imageTag} [skip ci]'"
+                        sh "git push https://${GITHUB_TOKEN}@github.com/maheshforce/new-poc.git main"
                     }
                 }
             }
