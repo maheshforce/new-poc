@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: 026847072954.dkr.ecr.ap-south-1.amazonaws.com/sample-app-prod
-  tag: "prod-9"
+  tag: "prod-10"
 
 efs:
   accessPointId: "fsap-040bd67ef60044b6d"
