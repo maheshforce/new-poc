@@ -43,7 +43,7 @@ spec:
                         sh 'echo \'{"credsStore":"ecr-login"}\' > /kaniko/.docker/config.json'
                         
                         // Run Kaniko build and push
-                        sh "/kaniko/executor --context=dir://. --dockerfile=sample-app/Dockerfile --destination=${destination}"
+                        sh "/kaniko/executor --context=dir://sample-app --dockerfile=Dockerfile --destination=${destination}"
                     }
                 }
             }
